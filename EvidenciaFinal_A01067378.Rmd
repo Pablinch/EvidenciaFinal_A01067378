@@ -1,0 +1,265 @@
+---
+title: "EvidenciaFinal_A01067378"
+author: "Pablo Macouzet, A01067378"
+date: "2023-10-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+# Instala y carga las librerías necesarias
+install.packages("shiny")
+install.packages("ggplot2")
+install.packages("dplyr")
+install.packages("lubridate")
+
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(shiny)
+
+# Leer el archivo csv
+laptop_sales <- read.csv("laptopsales.csv")
+head(laptop_sales)
+
+# Asegurarse de que el atributo ‘Date’ sea reconocido como fecha
+laptop_sales$Date <- as.Date(laptop_sales$Date, format="%Y-%m-%d")
+
+# Eliminar valores no finitos (NaN e infinitos) en la columna CustomerStoreDistance
+laptop_sales <- laptop_sales %>% filter(!is.na(CustomerStoreDistance) & is.finite(CustomerStoreDistance))
+
+ui <- fluidPage(
+    # Opciones de agregación temporal
+    selectInput("time_agg", "Agregación Temporal:",
+                choices = c("Diario", "Semanal", "Mensual")),
+    
+    # Control deslizante de ‘Distancia Cliente-Tienda’
+    sliderInput("dist_range", "Distancia Cliente-Tienda:",
+                min = min(laptop_sales$CustomerStoreDistance), 
+                max = max(laptop_sales$CustomerStoreDistance),
+                value = c(min(laptop_sales$CustomerStoreDistance), max(laptop_sales$CustomerStoreDistance))),
+    
+    # Visualizaciones
+    plotOutput("pricePlot"),
+    plotOutput("salesPlot")
+)
+
+server <- function(input, output) {
+    output$pricePlot <- renderPlot({
+        unit <- switch(input$time_agg,
+                       "Diario" = "days",
+                       "Semanal" = "weeks",
+                       "Mensual" = "months")
+        data_agg <- laptop_sales %>%
+            group_by(Date = floor_date(Date, unit = unit)) %>%
+            summarise(Avg_Price = mean(`Retail.Price`, na.rm = TRUE))
+        ggplot(data_agg, aes(x = Date, y = Avg_Price)) +
+            geom_line() +
+            labs(title = "Precio a lo Largo del Tiempo", x = "Fecha", y = "Precio Promedio")
+    })
+    
+    output$salesPlot <- renderPlot({
+        data_filtered <- laptop_sales %>%
+            filter(CustomerStoreDistance >= input$dist_range[1] & CustomerStoreDistance <= input$dist_range[2])
+        ggplot(data_filtered, aes(x = `Store.Postcode`, y = `Retail.Price`)) +
+            geom_boxplot() +
+            labs(title = "Distribución del Precio por Tienda", x = "Tienda", y = "Precio")
+    })
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+```{r}
+library(shiny)
+
+ui <- fluidPage(
+    titlePanel("Prueba de Integración"),
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("time_agg", "Agregación temporal:", choices = c("Diaria", "Semanal", "Mensual")),
+            sliderInput("dist_range", "Distancia Cliente-Tienda:", min = 0, max = 20000, value = c(0, 20000))
+        ),
+        mainPanel(
+            plotOutput("distPlot")
+        )
+    )
+)
+
+server <- function(input, output) {
+    output$distPlot <- renderPlot({
+        data <- rnorm(100) * input$dist_range[1] # Generamos 100 datos aleatorios
+        hist(data)
+    })
+}
+
+
+shinyApp(ui = ui, server = server)
+
+```
+
+
+```{r}
+laptopsales <- read.csv("laptopsales.csv")
+colnames(laptopsales)
+```
+
+```{r}
+# Instalando y cargando las bibliotecas necesarias
+install.packages(c("dplyr", "ggplot2", "lubridate", "tidyr"))
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+
+# Asumiendo que tu dataframe se llama data
+# data <- read.csv("laptopsales.csv")
+
+# Verificando los nombres de las columnas
+colnames(data)
+
+# Utilizando select con los nombres correctos
+# Utilizando select con los nombres correctos
+# Deseleccionando columnas utilizando %in%
+cols_to_remove <- c("Configuration", "Customer Postcode", "Store Postcode", "Integrated Wireless?", "Bundled Applications?")
+selected_data <- data[ , !(colnames(data) %in% cols_to_remove)]
+
+
+# Mostrar las primeras filas del dataframe seleccionado
+head(selected_data)
+
+
+# Estadísticas descriptivas de variables numéricas
+cols_to_remove <- c("Configuration", "Customer Postcode", "Store Postcode", "Integrated Wireless?", "Bundled Applications?")
+selected_data_for_summary <- data[ , !(colnames(data) %in% cols_to_remove)]
+summary(selected_data_for_summary)
+
+
+# Tendencia de ventas a lo largo del tiempo
+data %>%
+  filter(!is.na(Date)) %>%  # Excluyendo filas donde Date es NA
+  group_by(Date) %>%
+  summarise(AveragePrice = mean(data$`Retail Price`), TotalSales = length(data$Date)) %>%
+  ggplot(aes(x=Date)) +
+  geom_line(aes(y=AveragePrice, color="Average Price")) +
+  geom_line(aes(y=TotalSales, color="Total Sales")) +
+  labs(title="Tendencia de ventas y precio promedio a lo largo del tiempo") +
+  scale_y_continuous(sec.axis = sec_axis(~./10, name="Total Sales")) +
+  ylab("Average Price") +
+  theme_minimal()
+
+
+# Boxplot de precios por configuración
+data %>%
+  ggplot(aes(x=data$`Configuration`, y=data$`Retail Price`)) +
+  geom_boxplot() +
+  labs(title="Distribución de precios por configuración") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+
+
+# Relación entre tamaño de pantalla y precio
+data$BatteryLife <- data$`Battery Life (Hours)`
+head(data$BatteryLife)
+
+ggplot(data, aes(x=`Screen Size (Inches)`, y=`Retail Price`)) +
+  geom_point(aes(color=BatteryLife)) +
+  labs(title="Relación entre tamaño de pantalla y precio") +
+  theme_minimal()
+
+
+# Distancia de los clientes a las tiendas
+ggplot(data, aes(x=CustomerStoreDistance)) +
+  geom_histogram() +
+  labs(title="Distribución de la distancia de los clientes a las tiendas") +
+  theme_minimal()
+
+# Resumen por tienda
+data %>%
+  group_by(`Store Postcode`) %>%
+  summarize(TotalSales = sum(`Retail Price`), AvgPrice = mean(`Retail Price`), Count = n()) %>%
+  arrange(-TotalSales) %>%
+  head(10)
+
+# Asegurar que el cliente viaja la distancia correcta
+data <- data %>%
+  mutate(CalculatedDistance = sqrt((`OS X Customer` - `OS X Store`)^2 + (`OS Y Customer` - `OS Y Store`)^2))
+
+# Verificar si 'CustomerStoreDistance' es cercano a 'CalculatedDistance'
+summary(data$CalculatedDistance - data$CustomerStoreDistance)
+
+# ... (otros análisis relevantes se pueden agregar según la necesidad) ...
+
+```
+
+```{r}
+# Instala y carga las librerías necesarias
+install.packages("shiny")
+install.packages("ggplot2")
+install.packages("dplyr")
+install.packages("lubridate")
+
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(shiny)
+
+# Leer el archivo csv
+laptop_sales <- read.csv("laptopsales.csv")
+
+# Asegurarse de que el atributo ‘Date’ sea reconocido como fecha
+laptop_sales$Date <- as.Date(laptop_sales$Date, format = "%Y-%m-%d")
+
+ui <- fluidPage(
+  # Opciones de agregación temporal
+  selectInput("time_agg", "Agregación Temporal:",
+              choices = c("Diario", "Semanal", "Mensual")),
+  
+  # Control deslizante de ‘Distancia Cliente-Tienda’
+  sliderInput("dist_range", "Distancia Cliente-Tienda:",
+              min = min(laptop_sales$CustomerStoreDistance, na.rm = TRUE), 
+              max = max(laptop_sales$CustomerStoreDistance, na.rm = TRUE),
+              value = c(min(laptop_sales$CustomerStoreDistance, na.rm = TRUE), 
+                        max(laptop_sales$CustomerStoreDistance, na.rm = TRUE))),
+  
+  # Visualizaciones
+  plotOutput("pricePlot"),
+  plotOutput("salesPlot")
+)
+
+server <- function(input, output) {
+  output$pricePlot <- renderPlot({
+    unit <- switch(input$time_agg,
+                   "Diario" = "days",
+                   "Semanal" = "weeks",
+                   "Mensual" = "months")
+    data_agg <- laptop_sales %>%
+      group_by(Date = floor_date(Date, unit = unit)) %>%
+      summarise(Avg_Price = mean(`Retail Price`, na.rm = TRUE))
+    ggplot(data_agg, aes(x = Avg_Price)) +
+      geom_histogram(binwidth = 50) +
+      labs(title = "Distribución de Precios Promedio", x = "Precio Promedio")
+  })
+  
+  output$salesPlot <- renderPlot({
+    data_filtered <- laptop_sales %>%
+      filter(CustomerStoreDistance >= input$dist_range[1] & CustomerStoreDistance <= input$dist_range[2])
+    ggplot(data_filtered, aes(x = `Retail Price`)) +
+      geom_histogram(binwidth = 50) +
+      labs(title = "Distribución de Precios por Tienda", x = "Precio")
+  })
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
+
